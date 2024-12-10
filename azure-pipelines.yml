@@ -1,0 +1,53 @@
+trigger:
+- master
+
+pool:
+  vmImage: 'windows-latest'
+  
+variables:
+  buildConfiguration: 'Release'
+  profile: 'azure'
+  environment: 'Stage'
+
+steps:
+- task: SonarCloudPrepare@1
+  displayName: 'Prepare SonarCloud analysis'
+  inputs:
+    SonarCloud: 'SonarCloud'
+    organization: 'aqualityautomation'
+    projectKey: 'aquality-automation_aquality-selenium-dotnet-template'
+    projectName: 'aquality-selenium-dotnet-template'
+    projectVersion: '$(Build.BuildNumber)'
+    extraProperties: |
+      sonar.coverage.exclusions=**/**
+
+- task: UseDotNet@2
+  displayName: Use .NET 8.0
+  inputs:
+    packageType: 'sdk'
+    version: '8.0.x'
+
+- task: DotNetCoreCLI@2
+  displayName: 'Build whole solution'
+  env: 
+    MSBUILDSINGLELOADCONTEXT: 1  # https://github.com/SpecFlowOSS/SpecFlow/issues/1912
+  inputs:
+    command: 'build'
+    projects: Aquality.Selenium.Template/Aquality.Selenium.Template.sln
+    arguments: -c $(buildConfiguration)
+
+- task: SonarCloudAnalyze@1
+  displayName: 'Run SonarCloud code analysis'
+  continueOnError: true
+
+- task: SonarCloudPublish@1
+  displayName: 'Publish SonarCloud quality gate results'
+  continueOnError: true
+
+- task: DotNetCoreCLI@2
+  displayName: 'Run tests'
+  inputs:
+    command: 'test'
+    projects: '**/Aquality.Selenium.Template.SpecFlow.csproj'
+    arguments: -c $(buildConfiguration) --no-build
+    publishTestResults: true
